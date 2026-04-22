@@ -2,14 +2,6 @@
 #include "timer.h"
 #include "delay.h"
 
-#if defined(__CC_ARM) || defined(__ARMCC_VERSION)
-#define WS2812_DISABLE_IRQ() __disable_irq()
-#define WS2812_ENABLE_IRQ()  __enable_irq()
-#else
-#define WS2812_DISABLE_IRQ() __asm volatile ("cpsid i" : : : "memory")
-#define WS2812_ENABLE_IRQ()  __asm volatile ("cpsie i" : : : "memory")
-#endif
-
 uint16_t ws2812_dma_buf[LED_NUM * 24] = {0};
 
 void ws2812_set_color(uint16_t idx, uint8_t r, uint8_t g, uint8_t b)
@@ -36,19 +28,28 @@ void ws2812_show(void)
 {
     GPIO_InitTypeDef gpio_init;
     DMA_HandleTypeDef *dma_handle;
-    uint32_t timeout = 0x1FFFFU;
-
-    WS2812_DISABLE_IRQ();
+    HAL_StatusTypeDef dma_status;
 
     HAL_TIM_PWM_Stop_DMA(&TIM3_Handler, TIM_CHANNEL_3);
     __HAL_TIM_SET_COMPARE(&TIM3_Handler, TIM_CHANNEL_3, 0);
 
-    HAL_TIM_PWM_Start_DMA(&TIM3_Handler, TIM_CHANNEL_3, (uint32_t *)ws2812_dma_buf, LED_NUM * 24);
+    dma_status = HAL_TIM_PWM_Start_DMA(&TIM3_Handler, TIM_CHANNEL_3, (uint32_t *)ws2812_dma_buf, LED_NUM * 24);
+    if (dma_status != HAL_OK)
+    {
+        return;
+    }
 
     dma_handle = TIM3_Handler.hdma[TIM_DMA_ID_CC3];
-    while ((dma_handle != NULL) && (HAL_DMA_GetState(dma_handle) != HAL_DMA_STATE_READY) && (timeout > 0U))
+    if (dma_handle != NULL)
     {
-        timeout--;
+        /* Poll DMA complete flag to make repeated ws2812_show() calls reliable. */
+        dma_status = HAL_DMA_PollForTransfer(dma_handle, HAL_DMA_FULL_TRANSFER, 10);
+        if (dma_status != HAL_OK)
+        {
+            HAL_TIM_PWM_Stop_DMA(&TIM3_Handler, TIM_CHANNEL_3);
+            __HAL_TIM_SET_COMPARE(&TIM3_Handler, TIM_CHANNEL_3, 0);
+            return;
+        }
     }
 
     HAL_TIM_PWM_Stop_DMA(&TIM3_Handler, TIM_CHANNEL_3);
@@ -66,6 +67,4 @@ void ws2812_show(void)
     gpio_init.Mode = GPIO_MODE_AF_PP;
     gpio_init.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOB, &gpio_init);
-
-    WS2812_ENABLE_IRQ();
 }
