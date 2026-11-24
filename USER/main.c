@@ -20,6 +20,9 @@
 
 int main(void) {
   uint16_t i;
+	
+  uint8_t r_datas[6] = {0};
+	uint16_t len = 0;
 
   HAL_Init();                     // 初始化HAL库
   Stm32_Clock_Init(RCC_PLL_MUL9); // 设置时钟,72M
@@ -33,8 +36,7 @@ int main(void) {
     ws2812_set_color(i, 0, 0, 0);
   }
 
-  uint16_t len = 0;
-  uint8_t r_datas[6] = {0};
+  
   while (1) {
     if (USART_RX_STA & 0x8000) {
       len = USART_RX_STA & 0x3fff; // 得到此次接收到的数据长度
@@ -44,7 +46,8 @@ int main(void) {
       while (__HAL_UART_GET_FLAG(&UART1_Handler, UART_FLAG_TC) != SET)
         ;                 // 等待发送结束
       printf("\r\n\r\n"); // 插入换行
-      for (int i = 0; i < 6; ++i) {
+			
+      for (i = 0; i < 6; ++i) {
         r_datas[i] = USART_RX_BUF[i];
       }
       USART_RX_STA = 0;
