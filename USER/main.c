@@ -33,11 +33,13 @@ int main(void) {
   TIM3_PWM_Init(89, 0);           // 72MHz / (89 + 1) = 800kHz, period = 1.25us
 
   for (i = 0; i < LED_NUM; i++) {
-    ws2812_set_color(i, 0, 0, 0);
+    ws2812_set_color(i, 12, 34, 56);
   }
 
+  ws2812_show();
   
   while (1) {
+    // ws2812_show();
     if (USART_RX_STA & 0x8000) {
       len = USART_RX_STA & 0x3fff; // 得到此次接收到的数据长度
       printf("\r\n您发送的消息为:\r\n");
